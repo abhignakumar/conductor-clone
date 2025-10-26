@@ -7,6 +7,7 @@ async function main() {
     console.log("       AI Coding Agent");
     console.log("=================================");
     console.log("Enter 'exit' to exit.");
+    const args = process.argv.slice(2);
     const agent = new CodingAgent(process.env.MODEL_NAME!);
     while (true) {
         const userPrompt = await inputFromUserTerminal("> ");
@@ -14,7 +15,7 @@ async function main() {
             await agent.mcpClient.disconnect();
             process.exit(0);
         }
-        await agent.run(userPrompt, ["toolNode"])
+        await agent.run(userPrompt, args[0], ["toolNode"])
     }
 }
 

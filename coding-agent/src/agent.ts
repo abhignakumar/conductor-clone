@@ -44,14 +44,14 @@ export class CodingAgent {
         this.modelName = modelName;
     }
 
-    async connectToMCPServer() {
+    async connectToMCPServer(source: string) {
         await this.mcpClient.connectToLocalServer("docker", [
             "run",
             "-i",
             "--rm",
-            "--mount", `type=bind,src=${process.env.PROJECT_PATH!},dst=/projects/Workspaces`,
+            "--mount", `type=bind,src=${source},dst=/project/`,
             "mcp/filesystem",
-            "/projects"
+            "/project"
         ])
     }
 
@@ -139,11 +139,11 @@ export class CodingAgent {
         this.agentState.messages.data = [];
     }
 
-    async run(userPrompt: string, humanApprovalBefore?: string[]) {
+    async run(userPrompt: string, sourcePath: string, humanApprovalBefore?: string[]) {
         this.resetState();
         this.agentState.userPrompt.data = userPrompt;
         this.agentState.messages.data.push({ role: "user", parts: [{ text: "Start the implementation of the plan." }] });
-        await this.connectToMCPServer();
+        await this.connectToMCPServer(sourcePath);
         let currentNode: string = "START";
         while (currentNode !== "END") {
             if (humanApprovalBefore && humanApprovalBefore.includes(currentNode)) {
@@ -159,10 +159,12 @@ export class CodingAgent {
             Object.entries(result).forEach(([key, value]) => {
                 const stateKey = key as keyof AgentState;
                 if (this.agentState[stateKey]) {
-                    if (!this.agentState[stateKey].reducer)
+                    if (this.agentState[stateKey].reducer) {
+                        const reducerFunc = this.agentState[stateKey].reducer as (cur: typeof value, update: typeof value) => typeof value;
+                        this.agentState[stateKey].data = reducerFunc(this.agentState[stateKey].data, value);
+                    } else {
                         this.agentState[stateKey].data = value;
-                    else
-                        this.agentState[stateKey].data = this.agentState[stateKey].reducer(this.agentState[stateKey].data as any, value as any);
+                    }
                 }
             });
             currentNode = this.edges[currentNode]();
