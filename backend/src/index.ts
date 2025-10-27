@@ -13,8 +13,9 @@ app.use(cors());
 let originalProjectPath: string;
 let projectName: string;
 
-app.get("/select-project", (req, res) => {
-    originalProjectPath = req.query.projectPath as string;
+app.post("/select-project", (req, res) => {
+    const { projectPath } = req.body;
+    originalProjectPath = projectPath;
     projectName = originalProjectPath.split("/")[originalProjectPath.split("/").length - 1];
     res.json({ message: "Project selected." });
 })
