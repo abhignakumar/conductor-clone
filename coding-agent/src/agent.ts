@@ -64,7 +64,7 @@ export class CodingAgent {
             model: this.modelName,
             contents: this.agentState.userPrompt.data,
             config: {
-                systemInstruction: "You are a coding AI agent. Give a small plan to implement the user prompt."
+                systemInstruction: "You are a coding AI agent. You will have access to tools of File System MCP Server (Model Context Protocol). The project(codebase) is in '/project' directory. Understand the user prompt and give a small plan to implement it."
             }
         });
         const responseContent = response.candidates && response.candidates[0].content;
@@ -77,7 +77,7 @@ export class CodingAgent {
             model: this.modelName,
             contents: this.agentState.messages.data,
             config: {
-                systemInstruction: "You are a coding AI agent. You have access to tools of File System MCP Server (Model Context Protocol). Implement the following plan: \n" + this.agentState.plan.data,
+                systemInstruction: "You are a coding AI agent. You have access to tools of File System MCP Server (Model Context Protocol). Analyze the project/codebase which is in '/project' directory and implement the following plan: \n" + this.agentState.plan.data,
                 tools: [
                     {
                         functionDeclarations: this.mcpClient.getMCPTools()

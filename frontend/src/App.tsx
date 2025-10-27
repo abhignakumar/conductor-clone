@@ -15,16 +15,14 @@ import { Toaster } from "@/components/ui/sonner"
 import './App.css';
 import axios from 'axios';
 import { isAxiosError } from 'axios';
-import { API_BASE_URL } from './lib/config';
+import { API_BASE_URL, WORKSPACES_PATH, WS_BASE_URL } from './lib/config';
 import { toast } from 'sonner';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import Terminal from './components/terminal';
-import { createTerminalConnection } from './lib/utils';
-import { Terminal as XTerm } from "xterm";
+import TerminalView from './components/terminal';
 
 function App() {
   const [isOpen, setIsOpen] = useState(false);
@@ -34,12 +32,24 @@ function App() {
   const [newWorkspaceName, setNewWorkspaceName] = useState<string>("");
   const [popoverOpen, setPopoverOpen] = useState<boolean>(false);
   const [selectedWorkspace, setSelectedWorkspace] = useState<string>("");
-  const [terminal, setTerminal] = useState<Record<string, { term: XTerm, socket: WebSocket }>>({});
+  const [socket, setSocket] = useState<WebSocket | null>(null);
+  const [isRunning, setIsRunning] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (projectPath.trim() === "")
       setIsOpen(true);
   }, [projectPath]);
+
+  useEffect(() => {
+    const ws = new WebSocket(WS_BASE_URL);
+    setSocket(ws);
+    return () => ws.close();
+  }, []);
+
+  useEffect(() => {
+    if (selectedWorkspace.trim() !== "" && socket && isRunning[selectedWorkspace])
+      socket.send(JSON.stringify({ action: "RESUME", workspaceName: selectedWorkspace }));
+  }, [selectedWorkspace, socket, isRunning]);
 
   async function fetchWorkspaces() {
     try {
@@ -89,18 +99,15 @@ function App() {
   };
 
   const handleTerminalConnection = () => {
-    const { term, socket } = createTerminalConnection();
-    setTerminal(prev => ({ ...prev, [selectedWorkspace]: { term, socket } }));
+    if (!socket) return;
+    socket.send(JSON.stringify({ action: "START", workspaceName: selectedWorkspace, command: `pnpm start ${WORKSPACES_PATH}/${projectPath.split("/")[projectPath.split("/").length - 1]}/${selectedWorkspace}` }));
+    setIsRunning(prev => ({ ...prev, [selectedWorkspace]: true }));
   };
 
   const handleTerminalDisconnect = () => {
-    const { term, socket } = terminal[selectedWorkspace];
-    socket.close();
-    term.dispose();
-    setTerminal(prev => {
-      delete prev[selectedWorkspace];
-      return { ...prev };
-    });
+    if (!socket) return;
+    socket.send(JSON.stringify({ action: "STOP", workspaceName: selectedWorkspace }));
+    setIsRunning(prev => ({ ...prev, [selectedWorkspace]: false }));
   };
 
   return (
@@ -118,6 +125,7 @@ function App() {
           )}
           <Button
             onClick={() => setIsOpen(true)}
+            variant={"outline"}
           >
             Change Project
           </Button>
@@ -175,10 +183,13 @@ function App() {
               workspaces.map((workspace, index) => (
                 <div
                   key={index}
-                  className="p-2 rounded-lg bg-background hover:bg-accent hover:border-muted-foreground cursor-pointer transition-colors border overflow-hidden"
+                  className="py-2 px-3 rounded-lg bg-background hover:bg-accent hover:border-muted-foreground cursor-pointer transition-colors border flex items-center justify-between gap-x-3"
                   onClick={() => setSelectedWorkspace(workspace)}
                 >
-                  {workspace}
+                  <div className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                    {workspace}
+                  </div>
+                  <div className={`h-3 w-3 rounded-full ${isRunning[workspace] ? "bg-green-400" : "bg-gray-300"}`}></div>
                 </div>
               ))
             ) : (
@@ -195,12 +206,14 @@ function App() {
             <div className="text-xl">Please select a workspace</div>
           </div>
         </div> : <div className="flex-1 overflow-y-auto">
-          <div className="flex items-center gap-x-2 p-4">
-            <div className="font-semibold">Workspace Name</div>
-            <div className="text-sm bg-muted text-muted-foreground py-1 px-2 border rounded-md">
-              {selectedWorkspace}
+          <div className="flex items-center justify-between p-4">
+            <div className="flex items-center gap-x-2">
+              <div className="font-semibold">Workspace Name</div>
+              <div className="text-sm bg-muted text-muted-foreground font-semibold py-1 px-2 border border-muted-foreground rounded-md">
+                {selectedWorkspace}
+              </div>
             </div>
-            {terminal[selectedWorkspace] ?
+            {(isRunning[selectedWorkspace]) ?
               <Button onClick={handleTerminalDisconnect}>
                 <CircleStop />
                 Stop
@@ -211,7 +224,7 @@ function App() {
               </Button>}
           </div>
           <div className="p-4 h-4/5">
-            {terminal[selectedWorkspace] ? <Terminal term={terminal[selectedWorkspace].term} socket={terminal[selectedWorkspace].socket} /> :
+            {isRunning[selectedWorkspace] ? <TerminalView workspaceName={selectedWorkspace} socket={socket} /> :
               <div className="flex items-center justify-center p-4 h-full bg-accent rounded-lg border">
                 <TerminalIcon className="h-16 w-16 text-muted-foreground" />
               </div>}

@@ -1,30 +1,57 @@
 import { useEffect, useRef } from "react";
-import { Terminal as XTerm } from "xterm";
+import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
 import "xterm/css/xterm.css";
 
-export default function Terminal({ term, socket }: { term: XTerm, socket: WebSocket }) {
+export default function TerminalView({ workspaceName, socket }: {
+    workspaceName: string;
+    socket: WebSocket | null;
+}) {
     const terminalRef = useRef<HTMLDivElement | null>(null);
-    const fitAddon = useRef(new FitAddon()).current;
-    const socketRef = useRef<WebSocket | null>(null);
+    const fitAddon = new FitAddon();
 
     useEffect(() => {
-        term.loadAddon(fitAddon);
-        term.open(terminalRef.current!);
-        fitAddon.fit();
-        socketRef.current = socket;
-        window.addEventListener("resize", () => fitAddon.fit());
-    }, [fitAddon]);
+        if (!terminalRef.current || !socket) return;
 
-    return (
-        <div
-            ref={terminalRef}
-            style={{
-                width: "100%",
-                height: "100%",
-                backgroundColor: "#1e1e1e",
-                borderRadius: "6px",
-            }}
-        />
-    );
+        const xterm = new Terminal({
+            cursorBlink: true,
+            theme: { background: "#1e1e1e" },
+        });
+        xterm.loadAddon(fitAddon);
+        xterm.open(terminalRef.current);
+        fitAddon.fit();
+
+        socket.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+
+            if (msg.workspaceName !== workspaceName) return;
+
+            switch (msg.type) {
+                case "output":
+                    xterm.write(msg.data);
+                    break;
+
+                case "restore_logs":
+                    xterm.clear();
+                    msg.logs.forEach((chunk: string) => xterm.write(chunk));
+                    break;
+
+                case "stopped":
+                    xterm.write("\r\n[Session stopped]\r\n");
+                    break;
+            }
+        };
+
+        xterm.onData((input) => {
+            socket.send(JSON.stringify({ action: "INPUT", workspaceName, input }));
+        });
+        window.addEventListener("resize", () => fitAddon.fit());
+
+        return () => {
+            window.removeEventListener("resize", () => fitAddon.fit());
+            xterm.dispose();
+        };
+    }, [workspaceName, socket]);
+
+    return <div ref={terminalRef} className="h-full w-full bg-black" />;
 }
