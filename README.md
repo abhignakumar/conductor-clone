@@ -9,6 +9,10 @@ This project is a clone of the Y-Combinator backed startup "Conductor," enhanced
 - **Real-time Collaboration**: Interact with multiple workspaces simultaneously
 - **Modern Tech Stack**: Built with React, TypeScript, Express, and WebSockets
 
+## System Architecture
+
+![System Architecture](system_design.png)
+
 ## Project Structure
 
 ```
