@@ -11,7 +11,7 @@ This project is a clone of the Y-Combinator backed startup "Conductor," enhanced
 
 ## System Architecture
 
-![System Architecture](system_design.png)
+![System Architecture](system-design.png)
 
 ## Project Structure
 
